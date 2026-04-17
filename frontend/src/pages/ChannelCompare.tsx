@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, X, Users, Eye, Video, TrendingUp } from 'lucide-react'
+import { X, Users, Eye, Video, TrendingUp } from 'lucide-react'
 import {
   BarChart,
   Bar,
