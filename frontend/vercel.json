@@ -3,6 +3,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://youtube-insights-backend-production.up.railway.app/api/:path*"
+    },
+    {
+      "source": "/((?!assets/).*)",
+      "destination": "/index.html"
     }
   ]
 }
