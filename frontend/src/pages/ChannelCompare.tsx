@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { X, Users, Eye, Video, TrendingUp } from 'lucide-react'
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
@@ -11,10 +13,12 @@ import {
   Cell,
 } from 'recharts'
 import { useCompare } from '../hooks/useCompare'
+import { useIsMobile } from '../hooks/useIsMobile'
 import SearchBar from '../components/SearchBar'
 import ChartCard from '../components/ChartCard'
 import ErrorMessage from '../components/ErrorMessage'
 import Skeleton from '../components/Skeleton'
+import type { ChannelStats } from '@shared/types'
 
 const MAX_CHANNELS = 4
 
@@ -25,6 +29,103 @@ function formatCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
   return String(n)
+}
+
+function periodEndDate(key: string, period: 'monthly' | 'yearly'): Date {
+  if (period === 'yearly') return new Date(parseInt(key), 11, 31)
+  const [y, m] = key.split('-').map(Number)
+  return new Date(y, m, 0)
+}
+
+function buildTimeline(start: Date, end: Date, period: 'monthly' | 'yearly'): string[] {
+  const keys: string[] = []
+  if (period === 'yearly') {
+    for (let y = start.getFullYear(); y <= end.getFullYear(); y++) keys.push(String(y))
+    return keys
+  }
+  let y = start.getFullYear()
+  let m = start.getMonth() + 1
+  const endY = end.getFullYear()
+  const endM = end.getMonth() + 1
+  while (y < endY || (y === endY && m <= endM)) {
+    keys.push(`${y}-${String(m).padStart(2, '0')}`)
+    m++
+    if (m > 12) { m = 1; y++ }
+  }
+  return keys
+}
+
+// Logistic S-curve — mimics real YouTube growth: slow start, breakout phase
+// in the middle, plateau near present day. Normalized so f(0)=0 and f(1)=1,
+// matching the channel's current total exactly at today's date.
+const GROWTH_STEEPNESS = 4
+
+function growthFraction(t: number): number {
+  if (t <= 0) return 0
+  if (t >= 1) return 1
+  const sigmoid = (x: number) => 1 / (1 + Math.exp(-GROWTH_STEEPNESS * (x - 0.5)))
+  const s0 = sigmoid(0)
+  const s1 = sigmoid(1)
+  return (sigmoid(t) - s0) / (s1 - s0)
+}
+
+function buildGrowthData(
+  channels: ChannelStats[],
+  period: 'monthly' | 'yearly',
+  metric: 'viewCount' | 'subscriberCount',
+): Array<Record<string, string | number | null>> {
+  if (channels.length === 0) return []
+
+  const now = new Date()
+  const starts = channels.map((ch) => new Date(ch.publishedAt))
+  const earliest = new Date(Math.min(...starts.map((d) => d.getTime())))
+  const timeline = buildTimeline(earliest, now, period)
+
+  return timeline.map((key) => {
+    const row: Record<string, string | number | null> = { period: key }
+    const endOfPeriod = periodEndDate(key, period)
+    const refTime = Math.min(endOfPeriod.getTime(), now.getTime())
+
+    for (const ch of channels) {
+      const chStart = new Date(ch.publishedAt).getTime()
+      const totalMs = now.getTime() - chStart
+      if (totalMs <= 0 || refTime < chStart) {
+        row[ch.title] = null
+        continue
+      }
+      const fraction = Math.min(Math.max((refTime - chStart) / totalMs, 0), 1)
+      row[ch.title] = Math.round(ch[metric] * growthFraction(fraction))
+    }
+    return row
+  })
+}
+
+const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+function formatGrowthTick(value: string, period: 'monthly' | 'yearly', isMobile: boolean): string {
+  if (period === 'yearly') return value
+  const [year, month] = value.split('-')
+  if (isMobile) return `01/${month}/${year}`
+  return `${MONTH_NAMES[parseInt(month) - 1]}/${year}`
+}
+
+function dataMax(data: Array<Record<string, string | number | null>>): number {
+  let max = 0
+  for (const row of data) {
+    for (const key in row) {
+      const v = row[key]
+      if (typeof v === 'number' && v > max) max = v
+    }
+  }
+  return max
+}
+
+function buildTicks(max: number, step: number): number[] {
+  if (max <= 0) return [0]
+  const ticks: number[] = []
+  const top = Math.ceil(max / step) * step
+  for (let v = 0; v <= top; v += step) ticks.push(v)
+  return ticks
 }
 
 interface ChannelTagProps {
@@ -64,20 +165,35 @@ function TableSkeleton() {
 export default function ChannelCompare() {
   const [channelIds, setChannelIds] = useState<string[]>([])
   const [inputError, setInputError] = useState<string | null>(null)
+  const [searchKey, setSearchKey] = useState(0)
+  const [growthPeriod, setGrowthPeriod] = useState<'monthly' | 'yearly'>('monthly')
+  const [subsPeriod, setSubsPeriod] = useState<'monthly' | 'yearly'>('monthly')
+
+  const isMobile = useIsMobile()
 
   const { data, isLoading, error } = useCompare(channelIds)
+
+  const growthData = useMemo(() => {
+    if (!data) return []
+    return buildGrowthData(data.channels, growthPeriod, 'viewCount')
+  }, [data, growthPeriod])
+
+  const subsGrowthData = useMemo(() => {
+    if (!data) return []
+    return buildGrowthData(data.channels, subsPeriod, 'subscriberCount')
+  }, [data, subsPeriod])
+
+  const viewsTicks = useMemo(() => buildTicks(dataMax(growthData), 300_000_000), [growthData])
+  const subsTicks = useMemo(() => buildTicks(dataMax(subsGrowthData), 1_000_000), [subsGrowthData])
 
   function handleAddChannel(query: string) {
     setInputError(null)
 
-    // Accept channel ID, @handle, or full URL — extract the relevant part
     let id = query.trim()
 
-    // youtube.com/channel/UCxxxx
     const channelMatch = id.match(/\/channel\/(UC[\w-]+)/)
     if (channelMatch) id = channelMatch[1]
 
-    // youtube.com/@handle or just @handle
     const handleMatch = id.match(/^@?([\w.-]+)$/)
     if (!channelMatch && handleMatch) id = handleMatch[0].startsWith('@') ? handleMatch[0] : `@${handleMatch[0]}`
 
@@ -91,13 +207,13 @@ export default function ChannelCompare() {
     }
 
     setChannelIds((prev) => [...prev, id])
+    setSearchKey((k) => k + 1)
   }
 
   function handleRemove(id: string) {
     setChannelIds((prev) => prev.filter((c) => c !== id))
   }
 
-  // Build chart data from metrics
   const subscriberData = data?.metrics.map((m) => ({
     name: m.channelTitle,
     value: m.subscriberCount,
@@ -123,9 +239,11 @@ export default function ChannelCompare() {
       {/* Input section */}
       <div className="space-y-3">
         <SearchBar
+          key={searchKey}
           placeholder="ID do canal, @handle ou URL do YouTube…"
           onSearch={handleAddChannel}
           buttonLabel="Adicionar"
+          autoFocus={searchKey > 0}
         />
 
         {inputError && (
@@ -189,26 +307,10 @@ export default function ChannelCompare() {
               </thead>
               <tbody>
                 {[
-                  {
-                    label: 'Inscritos',
-                    icon: Users,
-                    key: 'subscriberCount' as const,
-                  },
-                  {
-                    label: 'Total de Visualizações',
-                    icon: Eye,
-                    key: 'viewCount' as const,
-                  },
-                  {
-                    label: 'Total de Vídeos',
-                    icon: Video,
-                    key: 'videoCount' as const,
-                  },
-                  {
-                    label: 'Média de Views / Vídeo',
-                    icon: TrendingUp,
-                    key: 'avgViewsPerVideo' as const,
-                  },
+                  { label: 'Inscritos', icon: Users, key: 'subscriberCount' as const },
+                  { label: 'Total de Visualizações', icon: Eye, key: 'viewCount' as const },
+                  { label: 'Total de Vídeos', icon: Video, key: 'videoCount' as const },
+                  { label: 'Média de Views / Vídeo', icon: TrendingUp, key: 'avgViewsPerVideo' as const },
                 ].map(({ label, icon: Icon, key }) => {
                   const values = data.metrics.map((m) => m[key])
                   const max = Math.max(...values)
@@ -225,15 +327,8 @@ export default function ChannelCompare() {
                         const val = m[key]
                         const isWinner = val === max
                         return (
-                          <td
-                            key={m.channelId}
-                            className="py-4 px-4 tabular-nums"
-                          >
-                            <span
-                              className={`text-sm font-medium ${
-                                isWinner ? 'text-white' : 'text-subtle'
-                              }`}
-                            >
+                          <td key={m.channelId} className="py-4 px-4 tabular-nums">
+                            <span className={`text-sm font-medium ${isWinner ? 'text-white' : 'text-subtle'}`}>
                               {formatCount(val)}
                             </span>
                             {isWinner && data.channels.length > 1 && (
@@ -257,7 +352,157 @@ export default function ChannelCompare() {
             </table>
           </div>
 
-          {/* Charts */}
+          {/* Growth chart */}
+          <ChartCard
+            title="Crescimento Estimado de Visualizações"
+            className="w-full"
+            headerRight={
+              <div className="flex gap-1">
+                {(['monthly', 'yearly'] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setGrowthPeriod(p)}
+                    className={`text-xs px-2.5 py-1 rounded-md transition ${
+                      growthPeriod === p
+                        ? 'bg-white/10 text-primary'
+                        : 'text-subtle hover:text-primary'
+                    }`}
+                  >
+                    {p === 'monthly' ? 'Mensal' : 'Anual'}
+                  </button>
+                ))}
+              </div>
+            }
+          >
+            {growthData.length === 0 ? (
+              <div className="h-[240px] flex items-center justify-center text-xs text-subtle">
+                Sem dados para este período
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={growthData} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
+                  <XAxis
+                    dataKey="period"
+                    tick={{ fill: '#6b6b6b', fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval="preserveStartEnd"
+                    tickFormatter={(v) => formatGrowthTick(v, growthPeriod, isMobile)}
+                  />
+                  <YAxis
+                    tickFormatter={formatCount}
+                    tick={{ fill: '#6b6b6b', fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={52}
+                    ticks={viewsTicks}
+                    domain={[0, viewsTicks[viewsTicks.length - 1] ?? 'auto']}
+                  />
+                  <Tooltip
+                    contentStyle={{ background: '#111', border: '1px solid #1f1f1f', borderRadius: 8 }}
+                    itemStyle={{ fontSize: 12 }}
+                    labelStyle={{ color: '#aaa', fontSize: 11, marginBottom: 4 }}
+                    labelFormatter={(v) => formatGrowthTick(v, growthPeriod, false)}
+                    formatter={(v: number, name: string) => [formatCount(v), name]}
+                  />
+                  <Legend
+                    wrapperStyle={{ fontSize: 11, color: '#6b6b6b' }}
+                    iconType="circle"
+                    iconSize={8}
+                  />
+                  {data.channels.map((ch, i) => (
+                    <Line
+                      key={ch.id}
+                      type="monotone"
+                      dataKey={ch.title}
+                      stroke={CHANNEL_COLORS[i % CHANNEL_COLORS.length]}
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 5 }}
+                      connectNulls
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+
+          {/* Subscribers growth chart */}
+          <ChartCard
+            title="Crescimento Estimado de Inscritos"
+            className="w-full"
+            headerRight={
+              <div className="flex gap-1">
+                {(['monthly', 'yearly'] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setSubsPeriod(p)}
+                    className={`text-xs px-2.5 py-1 rounded-md transition ${
+                      subsPeriod === p
+                        ? 'bg-white/10 text-primary'
+                        : 'text-subtle hover:text-primary'
+                    }`}
+                  >
+                    {p === 'monthly' ? 'Mensal' : 'Anual'}
+                  </button>
+                ))}
+              </div>
+            }
+          >
+            {subsGrowthData.length === 0 ? (
+              <div className="h-[240px] flex items-center justify-center text-xs text-subtle">
+                Sem dados para este período
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={subsGrowthData} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
+                  <XAxis
+                    dataKey="period"
+                    tick={{ fill: '#6b6b6b', fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval="preserveStartEnd"
+                    tickFormatter={(v) => formatGrowthTick(v, subsPeriod, isMobile)}
+                  />
+                  <YAxis
+                    tickFormatter={formatCount}
+                    tick={{ fill: '#6b6b6b', fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={52}
+                    ticks={subsTicks}
+                    domain={[0, subsTicks[subsTicks.length - 1] ?? 'auto']}
+                  />
+                  <Tooltip
+                    contentStyle={{ background: '#111', border: '1px solid #1f1f1f', borderRadius: 8 }}
+                    itemStyle={{ fontSize: 12 }}
+                    labelStyle={{ color: '#aaa', fontSize: 11, marginBottom: 4 }}
+                    labelFormatter={(v) => formatGrowthTick(v, subsPeriod, false)}
+                    formatter={(v: number, name: string) => [formatCount(v), name]}
+                  />
+                  <Legend
+                    wrapperStyle={{ fontSize: 11, color: '#6b6b6b' }}
+                    iconType="circle"
+                    iconSize={8}
+                  />
+                  {data.channels.map((ch, i) => (
+                    <Line
+                      key={ch.id}
+                      type="monotone"
+                      dataKey={ch.title}
+                      stroke={CHANNEL_COLORS[i % CHANNEL_COLORS.length]}
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 5 }}
+                      connectNulls
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+
+          {/* Bar charts */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <ChartCard title="Inscritos">
               <ResponsiveContainer width="100%" height={200}>

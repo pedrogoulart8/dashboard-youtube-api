@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, useRef, type FormEvent } from 'react'
 import { Search } from 'lucide-react'
 
 interface SearchBarProps {
@@ -6,10 +6,16 @@ interface SearchBarProps {
   onSearch: (query: string) => void
   defaultValue?: string
   buttonLabel?: string
+  autoFocus?: boolean
 }
 
-export default function SearchBar({ placeholder = 'Buscar…', onSearch, defaultValue = '', buttonLabel = 'Buscar' }: SearchBarProps) {
+export default function SearchBar({ placeholder = 'Buscar…', onSearch, defaultValue = '', buttonLabel = 'Buscar', autoFocus = false }: SearchBarProps) {
   const [value, setValue] = useState(defaultValue)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus()
+  }, [autoFocus])
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -22,6 +28,7 @@ export default function SearchBar({ placeholder = 'Buscar…', onSearch, default
       <div className="relative flex-1">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle pointer-events-none" />
         <input
+          ref={inputRef}
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}

@@ -1,5 +1,6 @@
 import type { VideoItem } from '@shared/types'
 import { Eye, ThumbsUp, Calendar } from 'lucide-react'
+import { useIsMobile } from '../hooks/useIsMobile'
 
 interface VideoCardProps {
   video: VideoItem
@@ -12,11 +13,18 @@ function formatCount(n: number): string {
   return String(n)
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('pt-BR', { month: 'short', day: 'numeric', year: 'numeric' })
+function formatDate(iso: string, isMobile: boolean): string {
+  const d = new Date(iso)
+  if (isMobile) {
+    const day = String(d.getDate()).padStart(2, '0')
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    return `${day}/${month}/${d.getFullYear()}`
+  }
+  return d.toLocaleDateString('pt-BR', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export default function VideoCard({ video, rank }: VideoCardProps) {
+  const isMobile = useIsMobile()
   return (
     <div className="bg-surface border border-border rounded-xl overflow-hidden hover:border-white/20 transition group">
       {/* Thumbnail */}
@@ -50,11 +58,11 @@ export default function VideoCard({ video, rank }: VideoCardProps) {
             <ThumbsUp size={12} />
             {formatCount(video.likeCount)}
           </span>
-          <span className="flex items-center gap-1 ml-auto">
-            <Calendar size={12} />
-            {formatDate(video.publishedAt)}
-          </span>
         </div>
+        <span className="flex items-center gap-1 text-xs text-subtle">
+          <Calendar size={12} />
+          {formatDate(video.publishedAt, isMobile)}
+        </span>
       </div>
     </div>
   )
