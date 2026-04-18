@@ -27,10 +27,10 @@ export default function Trending() {
   const { data, isLoading, error } = useTrending({ regionCode, maxResults: 20 })
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6 sm:space-y-8">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-semibold mb-1">Em Alta</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold mb-1">Em Alta</h1>
           <p className="text-sm text-subtle">Vídeos mais populares agora</p>
         </div>
 

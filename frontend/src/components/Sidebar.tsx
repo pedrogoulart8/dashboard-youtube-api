@@ -8,9 +8,21 @@ const nav = [
   { to: '/compare', label: 'Comparar Canais', icon: GitCompare },
 ]
 
-export default function Sidebar() {
+interface SidebarProps {
+  open: boolean
+  onClose: () => void
+}
+
+export default function Sidebar({ open, onClose }: SidebarProps) {
   return (
-    <aside className="w-56 flex-shrink-0 flex flex-col bg-surface border-r border-border h-screen">
+    <aside
+      className={[
+        'fixed md:static inset-y-0 left-0 z-30',
+        'w-56 flex-shrink-0 flex flex-col bg-surface border-r border-border h-screen',
+        'transition-transform duration-200 ease-in-out',
+        open ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+      ].join(' ')}
+    >
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-5 py-5 border-b border-border">
         <Youtube size={22} className="text-accent" />
@@ -23,6 +35,7 @@ export default function Sidebar() {
           <NavLink
             key={to}
             to={to}
+            onClick={onClose}
             className={({ isActive }) =>
               [
                 'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',

@@ -35,9 +35,9 @@ export default function ChannelAnalysis() {
     }))
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6 sm:space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold mb-1">Análise de Canal</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold mb-1">Análise de Canal</h1>
         <p className="text-sm text-subtle">Busque um canal pelo nome ou URL do YouTube</p>
       </div>
 

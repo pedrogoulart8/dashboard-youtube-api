@@ -51,9 +51,9 @@ export default function VideoSearch() {
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6 sm:space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold mb-1">Busca de Vídeos</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold mb-1">Busca de Vídeos</h1>
         <p className="text-sm text-subtle">Busque vídeos do YouTube com filtros</p>
       </div>
 
@@ -61,15 +61,15 @@ export default function VideoSearch() {
         <SearchBar placeholder="Buscar vídeos…" onSearch={handleSearch} />
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-subtle">Ordenar por</span>
-            <div className="flex rounded-lg border border-border overflow-hidden">
+            <span className="text-xs text-subtle shrink-0">Ordenar por</span>
+            <div className="flex rounded-lg border border-border overflow-hidden overflow-x-auto">
               {ORDERS.map(({ value, label }) => (
                 <button
                   key={value}
                   onClick={() => { setOrder(value); setPageToken(undefined); setPageHistory([]) }}
-                  className={`px-3 py-1.5 text-xs transition ${
+                  className={`px-3 py-1.5 text-xs transition whitespace-nowrap ${
                     order === value
                       ? 'bg-white text-black font-medium'
                       : 'text-subtle hover:text-primary'
@@ -82,13 +82,13 @@ export default function VideoSearch() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-subtle">Duração</span>
-            <div className="flex rounded-lg border border-border overflow-hidden">
+            <span className="text-xs text-subtle shrink-0">Duração</span>
+            <div className="flex rounded-lg border border-border overflow-hidden overflow-x-auto">
               {DURATIONS.map(({ value, label }) => (
                 <button
                   key={value}
                   onClick={() => { setDuration(value); setPageToken(undefined); setPageHistory([]) }}
-                  className={`px-3 py-1.5 text-xs transition ${
+                  className={`px-3 py-1.5 text-xs transition whitespace-nowrap ${
                     duration === value
                       ? 'bg-white text-black font-medium'
                       : 'text-subtle hover:text-primary'
