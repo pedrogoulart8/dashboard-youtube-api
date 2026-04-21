@@ -2,21 +2,11 @@
 
 Dashboard fullstack para análise de canais e vídeos do YouTube consumindo a YouTube Data API v3 em tempo real.
 
-[![Ver demo](https://img.shields.io/badge/Demo-ao_vivo-FF0033?style=for-the-badge)](https://SUA_URL.vercel.app)
-[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white&style=flat-square)]()
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white&style=flat-square)]()
-[![Fastify](https://img.shields.io/badge/Fastify-4-000000?logo=fastify&logoColor=white&style=flat-square)]()
-[![Redis](https://img.shields.io/badge/Redis-cache-DC382D?logo=redis&logoColor=white&style=flat-square)]()
-
-![Demo](./docs/demo.gif)
-
 ---
 
 ## Sobre o projeto
 
-Construí esse projeto pra praticar desenvolvimento fullstack com integração de API externa. A ideia foi ir além do frontend e montar um backend real com cache, validação e tratamento de erros — tudo que um projeto em produção precisaria ter.
-
-O app tem quatro modos: análise de canal, busca de vídeos com filtros, trending por região e comparador de até 4 canais lado a lado.
+Dashboard que consome dados do Youtube (YouTube Data API v3) e exibe métricas reais de canais do YouTube. Quatro modos: análise detalhada de canal com gráficos de performance, busca de vídeos com filtros, trending por região com distribuição por categoria, e comparador lado a lado de até 4 canais.
 
 ---
 
