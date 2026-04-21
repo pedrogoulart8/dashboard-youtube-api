@@ -22,15 +22,3 @@ Dashboard que consome dados do Youtube (YouTube Data API v3) e exibe métricas r
 | Deploy | Vercel + Railway |
 
 ---
-
-## Algumas decisões que tomei
-
-**Cache com fallback** — a YouTube API tem limite de 10k unidades por dia. Sem cache, uma sessão de testes esgota a quota em minutos. Implementei Redis com TTL de 15 minutos e um fallback automático para memória quando o Redis não está disponível, então o app funciona em dev sem configuração extra.
-
-**Fastify em vez de Express** — suporte nativo a TypeScript, plugins composáveis e mais rápido em benchmarks. Queria experimentar algo além do Express que é o padrão de todo tutorial.
-
-**Monorepo com shared/types** — frontend e backend compartilham as mesmas interfaces TypeScript. Se eu renomear um campo, o TypeScript reclama nos dois lugares ao mesmo tempo.
-
-**React Query** — gerencia loading, erro e cache no cliente sem boilerplate. Combinado com o cache de 15 min do backend, o consumo de quota cai drasticamente.
-
----
